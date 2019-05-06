@@ -107,8 +107,8 @@ begin
             sValue := ReadString('Files', Values.Strings[iNum], '');
             Settings[iNum].Name := Copy(sValue, 0, Pos('*', sValue) - 1);
             sValue := Copy(sValue, Pos('*', sValue), Length(sValue));
-            Settings[iNum].Filter := Copy(sValue, 0, Pos(' ', sValue) - 1);
-            sValue := Copy(sValue, Pos(' ', sValue), Length(sValue));
+            Settings[iNum].Filter := Trim(Copy(sValue, 0, Pos(',', sValue) - 1));
+            sValue := Trim(Copy(sValue, Pos(',', sValue), Length(sValue)));
             try
               Settings[iNum].Age := StrToInt(Copy(sValue, 0, Length(sValue)));
             except
