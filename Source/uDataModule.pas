@@ -69,8 +69,7 @@ begin
       begin
         bShowWindows := MForm.IntToBool(ReadInteger('Application',
           'bShowWindows', 1));
-        bWriteLog := MForm.IntToBool(ReadInteger('Application',
-          'bWriteLog', 1));
+        bWriteLog := MForm.IntToBool(ReadInteger('Application', 'bWriteLog', 1));
         sPathLog := ReadString('Application', 'sPathLog', sPath);
         try
           if not DirectoryExists(sPathLog) then
@@ -78,10 +77,8 @@ begin
               bLogExist := True
             else
             begin
-              MForm.AddToLog
-                ('Ошибка в параметре sPathLog. Невозможно создать директорию c именем "'
-                + sPathLog + '". Лог на диск не записан', True,
-                [fsBold], clRed);
+              MForm.AddToLog('Ошибка в параметре sPathLog. Невозможно создать директорию c именем "'
+                + sPathLog + '". Лог на диск не записан', True, [fsBold], clRed);
               bLogExist := False;
             end;
         except
@@ -92,8 +89,8 @@ begin
         end;
         sLogPref := ReadString('Application', 'sLogPref', DEF_PREF);
         iStartInterval := ReadInteger('Application', 'iStartInterval', MAX_AGE);
-        iDelInterval := ReadInteger('Application', 'iDelInterval',
-          DEL_INTERVAL);
+        iDelInterval := ReadInteger('Application', 'iDelInterval', DEL_INTERVAL);
+        bShowConsole := ReadBool('Application', 'bShowConsole', True);
         if Values = nil then
           Values := TStringList.Create
         else
@@ -108,7 +105,7 @@ begin
             Settings[iNum].Name := Copy(sValue, 0, Pos('*', sValue) - 1);
             sValue := Copy(sValue, Pos('*', sValue), Length(sValue));
             Settings[iNum].Filter := Trim(Copy(sValue, 0, Pos(',', sValue) - 1));
-            sValue := Trim(Copy(sValue, Pos(',', sValue), Length(sValue)));
+            sValue := Trim(Copy(sValue, Pos(',', sValue) + 1, Length(sValue)));
             try
               Settings[iNum].Age := StrToInt(Copy(sValue, 0, Length(sValue)));
             except
@@ -132,3 +129,4 @@ begin
 end;
 
 end.
+

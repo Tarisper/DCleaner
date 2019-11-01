@@ -75,19 +75,27 @@ object MForm: TMForm
       Top = 32
       Width = 435
       Height = 449
+      ParentCustomHint = False
       Align = alClient
+      BiDiMode = bdLeftToRight
+      Color = 15395562
+      Ctl3D = True
       Font.Charset = RUSSIAN_CHARSET
       Font.Color = clWindowText
       Font.Height = -11
       Font.Name = 'Tahoma'
       Font.Style = []
+      ParentBiDiMode = False
+      ParentCtl3D = False
       ParentFont = False
+      ParentShowHint = False
       ReadOnly = True
       ScrollBars = ssBoth
+      ShowHint = False
       TabOrder = 0
+      StyleElements = [seClient, seBorder]
       Zoom = 100
-      ExplicitTop = 29
-      ExplicitHeight = 452
+      ExplicitTop = 37
     end
     object ToolBar1: TToolBar
       Left = 5

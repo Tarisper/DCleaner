@@ -4,11 +4,11 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants,
-  System.Classes, System.UITypes, Vcl.Graphics,
-  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
-  System.Actions, Vcl.ActnList, Vcl.Menus, Vcl.StdActns, Vcl.ComCtrls,
-  DateUtils, Vcl.ToolWin, System.ImageList, Vcl.ImgList, Vcl.VirtualImageList,
-  Vcl.BaseImageCollection, Vcl.ImageCollection;
+  System.Classes, System.UITypes, Vcl.Graphics, Vcl.Controls, Vcl.Forms,
+  Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls, System.Actions, Vcl.ActnList,
+  Vcl.Menus, Vcl.StdActns, Vcl.ComCtrls, DateUtils, Vcl.ToolWin,
+  System.ImageList, Vcl.ImgList, Vcl.VirtualImageList, Vcl.BaseImageCollection,
+  Vcl.ImageCollection;
 
 const
   MAX_LENGTH_PATH = 55;
@@ -75,8 +75,8 @@ type
     procedure WriteLogFile(sText: string);
   public
     { Public declarations }
-    procedure AddToLog(sValue: string; bAddDateTime: Boolean = True;
-      fsStyle: TFontStyles = []; Color: Integer = 0);
+    procedure AddToLog(sValue: string; bAddDateTime: Boolean = True; fsStyle:
+      TFontStyles = []; Color: Integer = 0);
     function IntToBool(iValue: Integer): Boolean;
   end;
 
@@ -89,6 +89,7 @@ type
     sLogPref: string;
     iStartInterval: Integer;
     iDelInterval: Integer;
+    bShowConsole: Boolean;
   end;
 
 type
@@ -126,7 +127,8 @@ var
 
 implementation
 
-uses uDataModule, uAbout;
+uses
+  uDataModule, uAbout;
 
 {$R *.dfm}
 
@@ -136,6 +138,7 @@ var
   tsFA: TDateTime;
   iMinuts: Integer;
   sSumPath: string;
+  iDel, iNotDel: Integer;
 
   function GetDirTime(const aPath: string): TDateTime;
   var
@@ -157,13 +160,13 @@ var
       Result := -1;
   end;
 
-  function IsDirEmpty(const aPath: String): Boolean;
+  function IsDirEmpty(const aPath: string): Boolean;
   var
     fs: TSearchRec;
     aaPath: string;
   begin
     Result := True;
-    aaPath := IncludeTrailingPathDelimiter(aaPath);
+    aaPath := IncludeTrailingPathDelimiter(aPath);
     if FindFirst(aaPath + '*.*', faAnyFile, fs) = 0 then
       repeat
         if (fs.Name <> '.') and (fs.Name <> '..') then
@@ -176,8 +179,8 @@ var
     FindClose(fs);
   end;
 
-  procedure EnumFiles(const aPath, aFilter: string; const aAttr: Integer;
-    aSl: TStringList);
+  procedure EnumFiles(const aPath, aFilter: string; const aAttr: Integer; aSl:
+    TStringList);
   var
     Sr: TSearchRec;
     Attr: Integer;
@@ -200,19 +203,20 @@ var
             tsFA := GetDirTime(Sr.Name);
             iMinuts := MinutesBetween(tsFA, Now);
             // Отсеиваем каталоги "моложе" чем iAge.
-//            if (iMinuts >= iAge) then
-//            begin
-//              if IsDirEmpty(Sr.Name) then
+            if (iMinuts >= iAge) then
+            begin
+              if not IsDirEmpty(sPath + Sr.Name) then
                 EnumFiles(sPath + Sr.Name + '\', aFilter, aAttr, aSl);
-//            end;
+              aSl.Add(IncludeTrailingPathDelimiter(sPath + Sr.Name));
+            end;
             Continue;
           end;
           // Расширение найденного файла.
           sExt := AnsiUpperCase(ExtractFileExt(Sr.Name));
           // Принадлежит ли расширение списку заданных расширений.
-          sFilter := Copy(sFilter, Pos('.', sFilter),
-            Length(sFilter) - Pos('.', sFilter) + 1);
-          if sExt <> AnsiUpperCase(sFilter) then
+          sFilter := Copy(sFilter, Pos('.', sFilter), Length(sFilter) - Pos('.',
+            sFilter) + 1);
+          if (sExt <> AnsiUpperCase(sFilter)) and (Pos('*', sFilter) = 0) then
             Continue;
           // Добавляем найденный файл в список.
           if FileExists(Sr.Name) then
@@ -220,7 +224,8 @@ var
           else
             tsFA := GetDirTime(Sr.Name);
           iMinuts := MinutesBetween(tsFA, Now);
-          if (iMinuts >= iAge) or (faDirectory = (Sr.Attr and faDirectory)) then
+          if (iMinuts >= iAge) or (faDirectory = (Sr.Attr and faDirectory))
+            then
           begin
             aSl.Add(sPath + Sr.Name);
           end;
@@ -231,16 +236,19 @@ var
   end;
 
 begin
+  iDel := 0;
+  iNotDel := 0;
   if MForm.reLog.Lines.Count > MAX_LINES_COUNT then
     MForm.reLog.Clear;
   sSumPath := 'Очистка: ' + sPath;
   if Length(sSumPath) > MAX_LENGTH_PATH then
-    MForm.sbBar.Panels.Items[2].Text :=
-      Copy(sSumPath, 1, MAX_LENGTH_PATH) + '...'
+    MForm.sbBar.Panels.Items[2].Text := Copy(sSumPath, 1, MAX_LENGTH_PATH) +
+      '...'
   else
     MForm.sbBar.Panels.Items[2].Text := sSumPath;
+  MForm.AddToLog('', False);
   MForm.AddToLog('Очистка пути ' + sPath + sFilter, True);
-  MForm.AddToLog('Возраст файлов от ' + MForm.MinToTime(iAge) +
+  MForm.AddToLog('Возраст файлов и директорий от ' + MForm.MinToTime(iAge) +
     ' и старше', True);
   SetCurrentDir(sPath);
 {$IFDEF DEBUG}
@@ -249,13 +257,28 @@ begin
   Attr := faAnyFile - faDirectory;
   slToDel := TStringList.Create;
   EnumFiles(sPath, sFilter, Attr, slToDel);
-  MForm.AddToLog('Найдено файлов: ' + IntTOStr(slToDel.Count), True);
+  MForm.AddToLog('Найдено файлов и директорий: ' + IntTOStr(slToDel.Count),
+    True);
   iDelCount := 0;
+  MForm.AddToLog('Старт очистки', True, [fsBold]);
   for j := 0 to slToDel.Count - 1 do
   begin
     try
-      DeleteFile(slToDel[j]);
+      if not DirectoryExists(slToDel[j]) then
+      begin
+        if DeleteFile(slToDel[j]) then
+          Inc(iDel)
+        else
+          Inc(iNotDel);
+      end
+      else if RemoveDir(slToDel[j]) then
+        Inc(iDel)
+      else
+        Inc(iNotDel);
       Inc(iDelCount);
+      if ((j mod 2000) = 0) and (j > 0) then
+        MForm.AddToLog('Очистка продолжается. Очищено файлов и директорий: ' +
+          IntToStr(iDel), True);
       Sleep(AppSett.iDelInterval);
     except
     end;
@@ -284,13 +307,16 @@ begin
     FindClose(searchResult);
     end; }
   MForm.sbBar.Panels.Items[2].Text := '';
-  MForm.AddToLog('Очистка завершена. Очищено файлов: ' +
-    IntTOStr(iDelCount), True);
+  MForm.AddToLog('Очистка завершена. Очищено: ' + IntToStr(iDel), True, [fsBold],
+    $0041D739);
+  if iNotDel > 0 then
+    MForm.AddToLog('Не удалось удалить: ' + IntToStr(iNotDel), True, [fsBold],
+      clRed);
 end;
 
 procedure TDelThread.WriteCount(iNum, iCount: Integer);
 begin
-  MForm.AddToLog('Разбор ' + IntTOStr(iNum) + ' из ' + IntTOStr(iCount) +
+  MForm.AddToLog('Разбор ' + IntTOStr(iNum) + ' из ' + IntToStr(iCount) +
     ' завершён', True);
 end;
 
@@ -309,10 +335,11 @@ begin
       Break;
   end;
 end;
-
-// *****************************************************************************
+  // *****************************************************************************
 // Перевод минут в дни
-// *****************************************************************************
+
+  // *****************************************************************************
+
 function TMForm.MinToTime(iMin: Integer): string;
 const
   SecPerDay = 86400;
@@ -326,7 +353,8 @@ begin
   iH := (iSeconds mod SecPerDay) div SecPerHour;
   iM := ((iSeconds mod SecPerDay) mod SecPerHour) div SecPerMinute;
   if iD > 0 then
-    Result := IntToStr(iD) + ' д.' + IntTOStr(iH) + ' ч.' + IntTOStr(iM) + ' м.'
+    Result := IntToStr(iD) + ' д.' + IntTOStr(iH) + ' ч.' + IntTOStr(iM) +
+      ' м.'
   else
   begin
     if iH > 0 then
@@ -355,11 +383,12 @@ begin
     tmrClear.Enabled := True;
     tmrClear.Interval := 60 * 1000 * AppSett.iStartInterval;
     if bSecondLoad then
-      AddToLog('Настройки перечитаны', True, [fsBold], clGreen)
+      AddToLog('Настройки перечитаны', True, [fsBold], $0041D739)
     else
     begin
       bSecondLoad := True;
-      AddToLog('Настройки загружены');
+      AddToLog('Программа запущена', True, [], $0041D739);
+      AddToLog('Настройки загружены', True, [], $0041D739);
     end;
     Result := True;
   end
@@ -375,10 +404,11 @@ begin
     AddToLog(' 3. Нажмите кнопку "Продолжить работу"', False, [fsBold], clRed);
   end;
 end;
-
-// *****************************************************************************
+  // *****************************************************************************
 // Создание потока для очистки
-// *****************************************************************************
+
+  // *****************************************************************************
+
 procedure TMForm.CreateDelTread;
 begin
   if DelThread = nil then
@@ -396,13 +426,14 @@ begin
   MForm.ReadIniFiles;
   CreateDelTread;
 end;
-
-// *****************************************************************************
+  // *****************************************************************************
 // Получить версию исполняемого файла
-// *****************************************************************************
+
+  // *****************************************************************************
+
 function TMForm.GetInfo(sFileName: string): string;
 var
-  szName: array [0 .. 255] of Char;
+  szName: array[0..255] of Char;
   P: Pointer;
   Value: Pointer;
   Len: UINT;
@@ -420,21 +451,20 @@ begin
     FValid := False;
     FSize := GetFileVersionInfoSize(FFileName, FHandle);
     if FSize > 0 then
-      try
-        GetMem(FBuffer, FSize);
-        FValid := GetFileVersionInfo(FFileName, FHandle, FSize, FBuffer);
-      except
-        // FValid := False;
-        raise;
-      end;
+    try
+      GetMem(FBuffer, FSize);
+      FValid := GetFileVersionInfo(FFileName, FHandle, FSize, FBuffer);
+    except        // FValid := False;
+      raise;
+    end;
     Result := '';
     if FValid then
       VerQueryValue(FBuffer, '\VarFileInfo\Translation', P, Len)
     else
       P := nil;
     if P <> nil then
-      GetTranslationString :=
-        IntToHex(MakeLong(HiWord(Longint(P^)), LoWord(Longint(P^))), 8);
+      GetTranslationString := IntToHex(MakeLong(HiWord(Longint(P^)), LoWord(Longint
+        (P^))), 8);
     if FValid then
     begin
       StrPCopy(szName, '\StringFileInfo\' + GetTranslationString +
@@ -472,10 +502,10 @@ begin
     // а теперь включаем Exception при ошибке ввода-вывода
     // поскольку всё равно ничего поделать не можем
 {$I+}
-    try
-      ReWrite(tfFile);
-    except
-    end;
+  try
+    ReWrite(tfFile);
+  except
+  end;
   try
     WriteLn(tfFile, sText); // пишем
     CloseFile(tfFile); // закрываем
@@ -498,12 +528,13 @@ begin
       '.log', sText);
   end;
 end;
-
-// *****************************************************************************
+  // *****************************************************************************
 // Запись строки в лог
-// *****************************************************************************
-procedure TMForm.AddToLog(sValue: string; bAddDateTime: Boolean = True;
-  fsStyle: TFontStyles = []; Color: Integer = 0);
+
+  // *****************************************************************************
+
+procedure TMForm.AddToLog(sValue: string; bAddDateTime: Boolean = True; fsStyle:
+  TFontStyles = []; Color: Integer = 0);
 var
   iDefColor: Integer;
   fsDefStyle: TFontStyles;
@@ -521,13 +552,15 @@ begin
   sbBar.Panels.Items[1].Text := IntToStr(reLog.Lines.Count);
   if acWriteLog.Checked then
     WriteLogFile(sValue);
+  if AppSett.bShowConsole then
+    Writeln(sValue);
 end;
 
 procedure TMForm.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
 begin
   CanClose := MessageBox(Application.Handle,
-    'Вы действительно хотите выйти из программы?', 'Предупреждение',
-    MB_YESNO or MB_ICONQUESTION) = ID_YES;
+    'Вы действительно хотите выйти из программы?', 'Предупреждение', MB_YESNO
+    or MB_ICONQUESTION) = ID_YES;
 end;
 
 procedure TMForm.FormCreate(Sender: TObject);
@@ -536,8 +569,10 @@ var
   sVersion: string;
   sParam: string;
 begin
+  AllocConsole;
+    //  SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_BLUE or
+  //    FOREGROUND_GREEN or BACKGROUND_RED);
   reLog.PlainText := True;
-
   // Считываем параметр запуска и проверяем его корректность
   sAppName := ParamStr(0);
   sParam := ParamStr(1);
@@ -559,8 +594,8 @@ begin
   N9.Checked := acWriteLog.Checked;
   sAppName := Application.ExeName;
   sVersion := 'v.' + GetInfo(sAppName);
-  AddToLog('Версия ПО: ' + ExtractFileName(sAppName) + ' ' + sVersion, False,
-    [fsUnderline]);
+  AddToLog('Версия ПО: ' + ExtractFileName(sAppName) + ' ' + sVersion, False, [fsUnderline,
+    fsBold]);
   sbBar.Panels.Items[0].Text := sVersion;
   // AddToLog('Считывание настроек');
 end;
@@ -568,6 +603,7 @@ end;
 procedure TMForm.FormDestroy(Sender: TObject);
 begin
   AddToLog('Программа остановлена', True);
+  FreeConsole;
 end;
 
 procedure TMForm.acAboutExecute(Sender: TObject);
@@ -663,3 +699,4 @@ begin
 end;
 
 end.
+
